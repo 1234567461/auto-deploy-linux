@@ -1,0 +1,88 @@
+#cloud-config
+# 由 deploy.sh 渲染占位符：__HOSTNAME__ / __SSH_PUBKEY__ / __MC_EULA__
+# 占位符在写入 boot 分区前由 deploy.sh 的 python3 步骤替换。
+
+hostname: __HOSTNAME__
+manage_etc_hosts: true
+timezone: Asia/Shanghai
+locale: en_US.UTF-8
+
+users:
+  - name: pi
+    groups: users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
+    shell: /bin/bash
+    lock_passwd: false
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - __SSH_PUBKEY__
+
+enable_ssh: true
+ssh_pwauth: false
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - openjdk-21-jre-headless
+  - ufw
+  - curl
+  - tar
+  - tmux
+
+write_files:
+  - path: /opt/mc-server/install-paper.sh
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      MC_VERSION="${MC_VERSION:-1.21.4}"
+      DATA_DIR=/opt/mc-server
+      mkdir -p "$DATA_DIR/plugins" "$DATA_DIR/world"
+      cd "$DATA_DIR"
+      PAPER_BUILD=$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/$MC_VERSION" \
+        | python3 -c "import sys,json; print(json.load(sys.stdin)['builds'][-1])")
+      URL="https://api.papermc.io/v2/projects/paper/versions/$MC_VERSION/builds/$PAPER_BUILD/downloads/paper-$MC_VERSION-$PAPER_BUILD.jar"
+      echo "下载 PaperMC: $URL"
+      curl -fSL -o paper.jar "$URL"
+      echo "eula=__MC_EULA__" > eula.txt
+
+  - path: /opt/mc-server/server.properties
+    permissions: '0644'
+    owner: pi:pi
+    content: |
+      server-port=25565
+      max-players=8
+      view-distance=8
+      online-mode=true
+      motd=auto-deployed on Raspberry Pi
+
+  - path: /etc/systemd/system/mcserver.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Minecraft Server (PaperMC)
+      After=network-online.target
+      Wants=network-online.target
+      [Service]
+      Type=simple
+      User=pi
+      WorkingDirectory=/opt/mc-server
+      ExecStart=/usr/bin/java -Xmx1G -Xms512M -jar /opt/mc-server/paper.jar nogui
+      Restart=on-failure
+      RestartSec=10
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - chown -R pi:pi /opt/mc-server
+  - MC_EULA=__MC_EULA__ bash /opt/mc-server/install-paper.sh
+  - chown -R pi:pi /opt/mc-server
+  - systemctl daemon-reload
+  - systemctl enable --now mcserver
+  - ufw allow 22/tcp
+  - ufw allow 25565/tcp
+  - ufw --force enable
+
+final_message: "mc-pi 部署完成，用时 $UPTIME 秒。MC 服务器已启动，端口 25565。"

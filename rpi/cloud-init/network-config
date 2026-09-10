@@ -1,0 +1,6 @@
+version: 2
+ethernets:
+  eth0:
+    dhcp4: true
+    optional: true
+# Wi-Fi 凭证由 deploy.sh --wifi-ssid / --wifi-psk 自动注入覆盖此文件
