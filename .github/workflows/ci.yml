@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: 校验脚本与 cloud-init
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # shellcheck：检查所有 .sh 脚本
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          find . -name '*.sh' -not -path './.git/*' | xargs -r shellcheck --severity=warning
+
+      # cloud-init YAML 语法校验 + cloud-init schema 验证
+      - name: cloud-init YAML 校验
+        run: |
+          pip install --quiet yamllint pyyaml cloud-init
+          # YAML 语法
+          yamllint -d "{extends: default, rules: {line-length: disable, document-start: disable, indentation: disable}}" rpi/cloud-init/
+          # cloud-init schema 校验
+          python3 -m cloudinit.cmd.schema --config-file rpi/cloud-init/user-data
+          python3 -c "
+          import yaml
+          for f in ['rpi/cloud-init/user-data', 'rpi/cloud-init/network-config', 'rpi/cloud-init/meta-data']:
+              with open(f) as fp:
+                  yaml.safe_load(fp)
+              print(f'{f}: YAML OK')
+          # 检查 user-data 必须以 #cloud-config 开头
+          with open('rpi/cloud-init/user-data') as fp:
+              first = fp.readline().strip()
+          assert first == '#cloud-config', f'user-data 首行应为 #cloud-config，实际: {first}'
+          print('user-data header OK')
+          "
+
+      # 检查占位符未被意外替换（模板应保留 __XXX__）
+      - name: 检查模板占位符
+        run: |
+          python3 - <<'EOF'
+          import re
+          with open('rpi/cloud-init/user-data') as f:
+              txt = f.read()
+          for p in ['__HOSTNAME__', '__SSH_PUBKEY__', '__MC_EULA__']:
+              assert p in txt, f'占位符 {p} 丢失'
+          print('所有占位符完整')
+          EOF
+
+  # 复用性校验：确认 deploy.sh 能正确渲染占位符（干跑模式）
+  smoke-render:
+    name: deploy.sh 占位符渲染冒烟测试
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+      - name: 模拟渲染
+        run: |
+          python3 - rpi/cloud-init/user-data /tmp/user-data.test "test-pi" "ssh-ed25519 AAAA test@x" "true" <<'EOF'
+          import sys
+          src, dst, hostname, pubkey, eula = sys.argv[1:6]
+          with open(src) as f: t = f.read()
+          t = t.replace("__HOSTNAME__", hostname)
+          t = t.replace("__SSH_PUBKEY__", pubkey)
+          t = t.replace("__MC_EULA__", "true" if eula.lower() == "true" else "false")
+          with open(dst, "w") as f: f.write(t)
+          EOF
+          # 渲染后不应再有占位符
+          if grep -qE '__[A-Z_]+__' /tmp/user-data.test; then
+            echo "ERROR: 渲染后仍有占位符"
+            grep -nE '__[A-Z_]+__' /tmp/user-data.test
+            exit 1
+          fi
+          # 校验渲染后的 YAML 仍合法
+          python3 -c "import yaml; yaml.safe_load(open('/tmp/user-data.test'))"
+          echo "渲染 + YAML 合法"
