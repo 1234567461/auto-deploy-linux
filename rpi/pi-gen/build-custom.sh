@@ -4,9 +4,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-STAGE_DIR="$ROOT/rpi/pi-gen/stage-mc"
+STAGE_DIR="$ROOT/pi-gen/stage-mc"
 PI_GEN_REPO="https://github.com/RPi-Distro/pi-gen.git"
-WORK="${1:-$ROOT/rpi/pi-gen/work}"
+WORK="${1:-$ROOT/pi-gen/work}"
 
 mkdir -p "$WORK"
 
