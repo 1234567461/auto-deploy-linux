@@ -17,12 +17,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 安装依赖
+      - name: 安装系统依赖 (pi-gen 需要)
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq coreutils quilt parted qemu-user-static debootstrap zerofree zip \
-            dosfstools libarchive-tools xz-utils qemu-utils docker.io docker-buildx
-          sudo usermod -aG docker $USER
+            dosfstools libarchive-tools xz-utils qemu-utils rsync
+
+      - name: 安装 Docker (buildx)
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
 
       - name: 构建
         run: |
