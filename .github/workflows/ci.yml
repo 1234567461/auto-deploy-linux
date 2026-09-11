@@ -28,7 +28,7 @@ jobs:
           # YAML 语法
           yamllint -d "{extends: default, rules: {line-length: disable, document-start: disable, indentation: disable}}" rpi/cloud-init/
           # cloud-init schema 校验
-          python3 -m cloudinit.cmd.schema --config-file rpi/cloud-init/user-data
+          cloud-init devel schema --config-file rpi/cloud-init/user-data
           python3 -c "
           import yaml
           for f in ['rpi/cloud-init/user-data', 'rpi/cloud-init/network-config', 'rpi/cloud-init/meta-data']:
