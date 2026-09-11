@@ -57,7 +57,7 @@ fi
 for cmd in dd sgdisk; do
   command -v "$cmd" >/dev/null || { echo "缺少命令: $cmd"; exit 1; }
 done
-command -v xz >/dev/null && XZ=xz || XZ=cat
+if command -v xz >/dev/null 2>&1; then XZ="xz"; else XZ="cat"; fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CI_DIR="$ROOT/rpi/cloud-init"
