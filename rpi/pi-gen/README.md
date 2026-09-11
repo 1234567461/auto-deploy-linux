@@ -34,4 +34,10 @@ bash build-custom.sh
 
 ## CI 构建
 
-[`.github/workflows/build-image.yml`](../../.github/workflows/build-image.yml) 在 `rpi-image-build` 分支推送时触发，用 self-hosted runner 或 Docker 构建并上传产物到 GitHub Release。**注意**：pi-gen 构建需要较长时间和较大磁盘（20GB+），GitHub 托管 runner 可能超时/空间不足，建议用 self-hosted runner。
+[`.github/workflows/build-image.yml`](../../.github/workflows/build-image.yml) 在 `rpi-image-build` 分支推送时触发。
+
+> **⚠️ GitHub 托管 runner 限制**：pi-gen 构建需要约 20GB 磁盘空间和 30-60 分钟，GitHub 免费 runner（14GB 磁盘、6 小时超时）可能因磁盘不足或超时失败。**推荐用 self-hosted runner**（磁盘 ≥ 50GB）。构建失败时不影响 main 分支的 cloud-init 方案。
+
+构建成功后：
+- 产物作为 artifact 保留 7 天
+- 打 tag（`v*`）时自动发布到 GitHub Release
