@@ -1,0 +1,13 @@
+[Unit]
+Description=Download PaperMC on first boot
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/opt/mc-server/paper.jar
+
+[Service]
+Type=oneshot
+ExecStart=/opt/mc-server/install-paper.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
